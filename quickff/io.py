@@ -40,7 +40,7 @@ from quickff.log import log
 
 
 __all__ = ['VASPRun', 'read_abinitio', 'make_yaff_ei', 'dump_charmm22_prm',
-           'dump_charmm22_psf']
+           'dump_charmm22_psf', 'dump_charmm22_rtf']
 
 
 class VASPRun(object):
@@ -471,3 +471,76 @@ def dump_charmm22_psf(system, valence, fn):
             _bonds_to_charmm22_psf(valence),
             _angles_to_charmm22_psf(valence),
             _dihedrals_to_charmm22_psf(valence)))
+
+
+charmm22_rtf_template = '''\
+*>>>>>>>>      CHARMM22 All-Hydrogen Topology File        <<<<<<<
+31  1
+
+
+{}
+
+
+AUTO ANGLES DIHE
+
+
+{}
+
+'''
+
+def _atoms_to_charmm22_rtf(system):
+    counter = 900
+    result = []
+    for ffatype_id, ffatype in enumerate(system.ffatypes):
+        index = np.nonzero(system.ffatype_ids == ffatype_id)[0][0]
+        number = system.numbers[index]
+        if len(ffatype) > 4:
+            log.warning('Atom type too long for CHARMM RTF file: {}'.format(ffatype))
+        result.append('MASS  {:4d} {:<4s}{:10.5f} {:<2s}'.format(
+            counter, ffatype, periodic[number].mass/amu, periodic[number].symbol))
+        counter += 1
+    return '\n'.join(result)
+
+
+def _resi_to_charmm22_rtf(system):
+    charges = np.round(system.charges, 2)
+    total_charge = charges.sum()
+    error = total_charge - np.round(total_charge)
+    charges[0] -= error
+
+    result = ['RESI SOMENAME    {:-6.2f}'.format(charges.sum()), 'GROUP']
+    for iatom in xrange(system.natom):
+        ffatype = system.get_ffatype(iatom)
+        result.append('ATOM {:<4s} {:<4s}   {:-6.2f}'.format(
+            ffatype, ffatype, charges[iatom]
+        ))
+    result.append('BOND ')
+    for iatom0, iatom1 in system.bonds:
+        ffatype0 = system.get_ffatype(iatom0)
+        ffatype1 = system.get_ffatype(iatom1)
+        bond_str = '  {:<4s} {:<4s}'.format(ffatype0, ffatype1)
+        if len(result[-1]) > 30:
+            result.append('BOND ')
+        result[-1] += bond_str
+    return '\n'.join(result)
+
+
+def dump_charmm22_rtf(system, valence, fn):
+    """Dump supported internal coordinates in a CHARMM topology (rtf) file.
+
+       **Arguments**
+
+       system
+            Instance of yaff.System class
+
+       fn
+            The filename to write to.
+    """
+    # First report all types of terms not supported by CHARMM22.
+    _check_charmm22(valence)
+
+    # Dump supported internal coordinates into PSF file.
+    with open(fn, 'w') as f:
+        f.write(charmm22_rtf_template.format(
+            _atoms_to_charmm22_rtf(system),
+            _resi_to_charmm22_rtf(system)))

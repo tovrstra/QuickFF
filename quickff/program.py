@@ -28,7 +28,7 @@ from quickff.valence import ValenceFF
 from quickff.perturbation import RelaxedStrain
 from quickff.cost import HessianFCCost
 from quickff.paracontext import paracontext
-from quickff.io import dump_charmm22_prm, dump_charmm22_psf
+from quickff.io import dump_charmm22_prm, dump_charmm22_psf, dump_charmm22_rtf
 from quickff.log import log
 
 from yaff.system import System
@@ -74,6 +74,9 @@ class BaseProgram(object):
 
             fn_charmm22_psf
                 the name of a CHARMM topology file. If not given, the file is not written
+
+            fn_charmm22_rtf
+                the name of a CHARMM topology database file. If not given, the file is not written
 
             fn_sys
                 the name of the file to write the system to. The default is
@@ -214,6 +217,9 @@ class BaseProgram(object):
         fn_charmm22_psf = self.kwargs.get('fn_charmm22_psf')
         if fn_charmm22_psf is not None:
             dump_charmm22_psf(self.system, self.valence, fn_charmm22_psf)
+        fn_charmm22_rtf = self.kwargs.get('fn_charmm22_rtf')
+        if fn_charmm22_rtf is not None:
+            dump_charmm22_rtf(self.system, self.valence, fn_charmm22_rtf)
         fn_sys = self.kwargs.get('fn_sys', None)
         if fn_sys is None:
             fn_sys = 'system%s.chk' %(self.kwargs.get('suffix', ''))
