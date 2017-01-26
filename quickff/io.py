@@ -431,7 +431,7 @@ def _ics_to_charmm22_psf(valence, label, maxwidth, header):
     nic = 0
     for term in valence.iter_terms(label=label):
         if valence.is_negligible(term.master): continue
-        # Extract iatom0, iatom1
+        # Extract iatom0, iatom1, ...
         iatoms = term.get_atoms()
         # Predict what the width will be and fix if needed
         width += len(iatoms)
@@ -494,9 +494,6 @@ charmm22_rtf_template = '''\
 {}
 
 
-AUTO ANGLES DIHE
-
-
 {}
 
 '''
@@ -515,7 +512,23 @@ def _atoms_to_charmm22_rtf(system):
     return '\n'.join(result)
 
 
-def _resi_to_charmm22_rtf(system):
+def _ics_to_charmm22_rtf(valence, label, prefix, maxwidth, atomnames):
+    result = [prefix]
+    for term in valence.iter_terms(label=label):
+        if valence.is_negligible(term.master): continue
+        # Extract iatom0, iatom1, ...
+        iatoms = term.get_atoms()
+        # Convert to string and add to result
+        extra = ' '.join([atomnames[iatom] for iatom in iatoms])
+        # Make new line if needed
+        if len(result[-1]) + len(extra) + 1 > maxwidth:
+            result.append(prefix)
+        # Add new string
+        result[-1] += ' ' + extra
+    return result
+
+
+def _resi_to_charmm22_rtf(system, valence):
     charges = np.round(system.charges, 2)
     total_charge = charges.sum()
     error = total_charge - np.round(total_charge)
@@ -528,12 +541,9 @@ def _resi_to_charmm22_rtf(system):
         result.append('ATOM {:<4s} {:<4s}   {:-6.2f}'.format(
             atomnames[iatom], ffatype, charges[iatom]
         ))
-    result.append('BOND ')
-    for iatom0, iatom1 in system.bonds:
-        bond_str = '  {:<4s} {:<4s}'.format(atomnames[iatom0], atomnames[iatom1])
-        if len(result[-1]) > 30:
-            result.append('BOND ')
-        result[-1] += bond_str
+    result.extend(_ics_to_charmm22_rtf(valence, 'BONDHARM', 'BOND ', 80, atomnames))
+    result.extend(_ics_to_charmm22_rtf(valence, 'BENDAHARM', 'ANGLE ', 80, atomnames))
+    result.extend(_ics_to_charmm22_rtf(valence, 'TORSION', 'DIHE ', 80, atomnames))
     return '\n'.join(result)
 
 
@@ -555,4 +565,4 @@ def dump_charmm22_rtf(system, valence, fn):
     with open(fn, 'w') as f:
         f.write(charmm22_rtf_template.format(
             _atoms_to_charmm22_rtf(system),
-            _resi_to_charmm22_rtf(system)))
+            _resi_to_charmm22_rtf(system, valence)))
