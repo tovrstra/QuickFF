@@ -401,14 +401,27 @@ PSF
 
 '''
 
+def _get_charm22_atomnames(system):
+    counters = {}
+    result = []
+    for number in system.numbers:
+        symbol = periodic[number].symbol.upper()
+        index = counters.setdefault(number, 0)
+        result.append('{}{}'.format(symbol, index))
+        counters[number] = index + 1
+    return result
+
+
 def _atoms_to_charmm22_psf(system):
     result = ['{:8d} !NATOM'.format(system.natom)]
+    atomnames = _get_charm22_atomnames(system)
     for iatom in xrange(system.natom):
         ffatype = system.get_ffatype(iatom)
         if len(ffatype) > 4:
             log.warning('Atom type too long for CHARMM PSF file: {}'.format(ffatype))
         result.append('{:8d} A    1    MOL  {:4} {:4} {:10.6f} {:13.4f}           0'.format(
-            iatom+1, ffatype, ffatype, system.charges[iatom], system.masses[iatom]/amu))
+            iatom+1, atomnames[iatom], ffatype, system.charges[iatom],
+            system.masses[iatom]/amu))
     return '\n'.join(result)
 
 
@@ -508,17 +521,16 @@ def _resi_to_charmm22_rtf(system):
     error = total_charge - np.round(total_charge)
     charges[0] -= error
 
-    result = ['RESI SOMENAME    {:-6.2f}'.format(charges.sum()), 'GROUP']
+    result = ['RESI MOL         {:-6.2f}'.format(charges.sum()), 'GROUP']
+    atomnames = _get_charm22_atomnames(system)
     for iatom in xrange(system.natom):
         ffatype = system.get_ffatype(iatom)
         result.append('ATOM {:<4s} {:<4s}   {:-6.2f}'.format(
-            ffatype, ffatype, charges[iatom]
+            atomnames[iatom], ffatype, charges[iatom]
         ))
     result.append('BOND ')
     for iatom0, iatom1 in system.bonds:
-        ffatype0 = system.get_ffatype(iatom0)
-        ffatype1 = system.get_ffatype(iatom1)
-        bond_str = '  {:<4s} {:<4s}'.format(ffatype0, ffatype1)
+        bond_str = '  {:<4s} {:<4s}'.format(atomnames[iatom0], atomnames[iatom1])
         if len(result[-1]) > 30:
             result.append('BOND ')
         result[-1] += bond_str
